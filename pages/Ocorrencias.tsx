@@ -1,9 +1,8 @@
-
 import React, { useState } from 'react';
 import { base44 } from '../api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea, Label, Popover, PopoverContent, PopoverTrigger } from '../components/ui';
-import { Plus, Search, FileText, Clock, ArrowRightLeft, X, Save, Trash2, AlertTriangle } from 'lucide-react';
+import { Plus, Search, FileText, Clock, ArrowRightLeft, X, Save, Trash2, AlertTriangle, StickyNote, PenLine, Minus, Maximize2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -53,6 +52,186 @@ function DeleteAction({ onConfirm }: { onConfirm: () => void }) {
   );
 }
 
+// --- Notepad Modal Component ---
+function NotepadModal({ 
+  isOpen, 
+  isMinimized,
+  onClose, 
+  onMinimize,
+  onMaximize,
+  onSaveRequest 
+}: { 
+  isOpen: boolean, 
+  isMinimized: boolean,
+  onClose: () => void, 
+  onMinimize: () => void,
+  onMaximize: () => void,
+  onSaveRequest: (text: string) => void 
+}) {
+  const [text, setText] = useState('');
+
+  if (!isOpen) return null;
+
+  if (isMinimized) {
+    return (
+      <div className="fixed bottom-4 right-4 z-50 animate-in slide-in-from-bottom-10 fade-in">
+        <Button 
+          onClick={onMaximize}
+          className="h-14 w-14 rounded-full bg-yellow-500 hover:bg-yellow-600 text-white shadow-xl border-2 border-white flex items-center justify-center"
+          title="Abrir Bloco de Notas"
+        >
+          <StickyNote className="h-8 w-8" />
+          <span className="absolute -top-1 -right-1 flex h-4 w-4">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
+          </span>
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <Card className="w-full max-w-3xl h-[80vh] flex flex-col shadow-2xl border-yellow-200 bg-[#fefce8] relative overflow-hidden">
+        {/* Header de Bloco de Notas */}
+        <div className="bg-yellow-100 border-b border-yellow-200 p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-yellow-800">
+            <StickyNote className="h-6 w-6" />
+            <div>
+              <h3 className="font-bold text-lg leading-none">Bloco de Notas de Plantão</h3>
+              <p className="text-xs opacity-70">Escreva durante o turno. Minimize se precisar.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={onMinimize} className="text-yellow-800 hover:bg-yellow-200" title="Minimizar">
+              <Minus className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={onClose} className="text-yellow-800 hover:bg-yellow-200" title="Fechar (Perder alterações)">
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Área de Texto (Linhas de caderno) */}
+        <div className="flex-1 p-0 relative bg-[#fefce8]">
+          <textarea
+            className="w-full h-full p-6 text-lg leading-8 bg-transparent border-none resize-none focus:ring-0 outline-none text-slate-800 font-medium"
+            style={{ 
+              backgroundImage: 'linear-gradient(transparent, transparent 31px, #e5e7eb 31px)',
+              backgroundSize: '100% 32px',
+              lineHeight: '32px'
+            }}
+            placeholder="Digite aqui as ocorrências do dia, observações ou pendências..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            autoFocus
+          />
+        </div>
+
+        {/* Footer Actions */}
+        <div className="p-4 border-t border-yellow-200 bg-yellow-50 flex justify-end gap-3">
+          <Button 
+            type="button" 
+            variant="ghost" 
+            onClick={onMinimize}
+            className="text-yellow-900 hover:bg-yellow-100"
+          >
+            Minimizar
+          </Button>
+          <Button 
+            type="button" 
+            onClick={() => {
+              if (!text.trim()) return alert("O bloco de notas está vazio.");
+              onSaveRequest(text);
+            }}
+            className="bg-yellow-600 hover:bg-yellow-700 text-white shadow-md border-yellow-700"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Salvar em Ocorrências
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// --- Confirm Shift Handover Modal ---
+function ConfirmHandoverModal({ isOpen, onClose, onConfirm, funcionarios }: any) {
+  const [saindo, setSaindo] = useState('');
+  const [entrando, setEntrando] = useState('');
+
+  if (!isOpen) return null;
+
+  const handleConfirm = () => {
+    if (!saindo || !entrando) {
+      alert("Selecione quem está saindo e quem está entrando.");
+      return;
+    }
+    const funcSaindo = funcionarios.find((f: any) => f.id === saindo);
+    const funcEntrando = funcionarios.find((f: any) => f.id === entrando);
+    
+    onConfirm({
+      saindoId: saindo,
+      saindoNome: funcSaindo?.nome_completo,
+      entrandoId: entrando,
+      entrandoNome: funcEntrando?.nome_completo
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in zoom-in-95 duration-200">
+      <Card className="w-full max-w-md shadow-2xl bg-white border-0">
+        <CardHeader className="bg-slate-50 border-b pb-4">
+          <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <ArrowRightLeft className="h-5 w-5 text-blue-600" />
+            Passagem de Posto
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6 space-y-4">
+          <p className="text-sm text-slate-600 mb-2">
+            Para salvar as notas do turno, confirme os funcionários responsáveis pela passagem.
+          </p>
+          
+          <div className="space-y-2">
+            <Label>Funcionário Saindo (Entregando)</Label>
+            <Select value={saindo} onValueChange={setSaindo}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                {funcionarios.map((f: any) => (
+                  <SelectItem key={f.id} value={f.id}>{f.nome_completo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Funcionário Entrando (Recebendo)</Label>
+            <Select value={entrando} onValueChange={setEntrando}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                {funcionarios.map((f: any) => (
+                  <SelectItem key={f.id} value={f.id}>{f.nome_completo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button type="button" onClick={handleConfirm} className="bg-blue-600 hover:bg-blue-700 text-white">
+              Confirmar e Salvar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // --- Form ---
 function OcorrenciaForm({ ocorrencia, onSubmit, onCancel }: any) {
   const [formData, setFormData] = useState(ocorrencia || {
@@ -86,6 +265,14 @@ function OcorrenciaForm({ ocorrencia, onSubmit, onCancel }: any) {
     });
   };
 
+  const handleSubmit = () => {
+    if (!formData.relato) {
+      alert("O campo relato é obrigatório.");
+      return;
+    }
+    onSubmit(formData);
+  };
+
   return (
     <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm mb-6">
       <CardHeader className="border-b">
@@ -97,7 +284,7 @@ function OcorrenciaForm({ ocorrencia, onSubmit, onCancel }: any) {
         </div>
       </CardHeader>
       <CardContent className="p-6">
-        <form onSubmit={(e) => { e.preventDefault(); onSubmit(formData); }} className="space-y-6">
+        <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <Label htmlFor="funcionario_saindo">Funcionário Saindo</Label>
@@ -158,7 +345,11 @@ function OcorrenciaForm({ ocorrencia, onSubmit, onCancel }: any) {
             <Button type="button" variant="outline" onClick={onCancel}>
               Cancelar
             </Button>
-            <Button type="submit" className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700">
+            <Button 
+              type="button" 
+              onClick={handleSubmit}
+              className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700"
+            >
               <Save className="h-4 w-4 mr-2" />
               {ocorrencia ? 'Salvar' : 'Registrar'}
             </Button>
@@ -173,6 +364,11 @@ function OcorrenciaForm({ ocorrencia, onSubmit, onCancel }: any) {
 export default function Ocorrencias() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [showNotepad, setShowNotepad] = useState(false);
+  const [isNotepadMinimized, setIsNotepadMinimized] = useState(false);
+  const [showHandoverModal, setShowHandoverModal] = useState(false);
+  const [notepadTextToSave, setNotepadTextToSave] = useState('');
+  
   const [editingOcorrencia, setEditingOcorrencia] = useState<any>(null);
   const [viewingOcorrencia, setViewingOcorrencia] = useState<any>(null);
   const queryClient = useQueryClient();
@@ -183,6 +379,11 @@ export default function Ocorrencias() {
     staleTime: 30000,
   });
 
+  const { data: funcionarios = [] } = useQuery({
+    queryKey: ['funcionarios'],
+    queryFn: () => base44.entities.Funcionario.list(),
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: any) => base44.entities.Ocorrencia.create({
       ...data,
@@ -191,17 +392,10 @@ export default function Ocorrencias() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ocorrencias'] });
       setShowForm(false);
+      setShowNotepad(false);
+      setIsNotepadMinimized(false);
+      setShowHandoverModal(false);
       setEditingOcorrencia(null);
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: any) => base44.entities.Ocorrencia.update(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ocorrencias'] });
-      setShowForm(false);
-      setEditingOcorrencia(null);
-      setViewingOcorrencia(null);
     },
   });
 
@@ -211,6 +405,24 @@ export default function Ocorrencias() {
       queryClient.invalidateQueries({ queryKey: ['ocorrencias'] });
     },
   });
+
+  // Handler chamado quando clica em salvar no bloco de notas
+  const handleNotepadSaveRequest = (text: string) => {
+    setNotepadTextToSave(text);
+    setShowHandoverModal(true); // Abre modal de confirmação de passagem
+  };
+
+  // Handler chamado quando confirma a passagem de turno no modal
+  const handleHandoverConfirm = (data: any) => {
+    createMutation.mutate({
+      relato: notepadTextToSave,
+      funcionario_saindo_id: data.saindoId,
+      funcionario_saindo_nome: data.saindoNome,
+      funcionario_entrando_id: data.entrandoId,
+      funcionario_entrando_nome: data.entrandoNome,
+      data_registro: new Date().toISOString()
+    });
+  };
 
   const filteredOcorrencias = ocorrencias.filter((o: any) => {
     const matchSearch = o.relato?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -226,17 +438,32 @@ export default function Ocorrencias() {
           <h1 className="text-3xl font-bold text-slate-900">Ocorrências e Passagem de Turno</h1>
           <p className="text-slate-600 mt-1">Registro de ocorrências e troca de turno</p>
         </div>
-        <Button
-          type="button"
-          onClick={() => {
-            setEditingOcorrencia(null);
-            setShowForm(true);
-          }}
-          className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 shadow-lg"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Nova Ocorrência
-        </Button>
+        <div className="flex gap-2">
+          {!showNotepad && (
+            <Button
+              type="button"
+              onClick={() => {
+                setShowNotepad(true);
+                setIsNotepadMinimized(false);
+              }}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white shadow-lg"
+            >
+              <PenLine className="h-5 w-5 mr-2" />
+              Bloco de Notas
+            </Button>
+          )}
+          <Button
+            type="button"
+            onClick={() => {
+              setEditingOcorrencia(null);
+              setShowForm(true);
+            }}
+            className="bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 shadow-lg"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Nova Ocorrência
+          </Button>
+        </div>
       </div>
 
       <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
@@ -246,22 +473,37 @@ export default function Ocorrencias() {
             <Input
               placeholder="Buscar por funcionário ou texto do relato..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              onChange={(e: any) => setSearchTerm(e.target.value)}
+              className="pl-10 !text-black"
+              style={{ backgroundColor: 'white', color: 'black', height: '40px', opacity: 1 }}
             />
           </div>
         </CardContent>
       </Card>
 
+      {/* Notepad Modal & Handover Confirmation */}
+      <NotepadModal 
+        isOpen={showNotepad} 
+        isMinimized={isNotepadMinimized}
+        onClose={() => setShowNotepad(false)} 
+        onMinimize={() => setIsNotepadMinimized(true)}
+        onMaximize={() => setIsNotepadMinimized(false)}
+        onSaveRequest={handleNotepadSaveRequest} 
+      />
+
+      <ConfirmHandoverModal 
+        isOpen={showHandoverModal}
+        onClose={() => setShowHandoverModal(false)}
+        onConfirm={handleHandoverConfirm}
+        funcionarios={funcionarios}
+      />
+
       {showForm && (
         <OcorrenciaForm
           ocorrencia={editingOcorrencia}
           onSubmit={(data: any) => {
-            if (editingOcorrencia) {
-              updateMutation.mutate({ id: editingOcorrencia.id, data });
-            } else {
-              createMutation.mutate(data);
-            }
+            // Update mutation is not defined in this scope for simplicity, assumed logic for create
+            createMutation.mutate(data);
           }}
           onCancel={() => {
             setShowForm(false);
@@ -312,17 +554,7 @@ export default function Ocorrencias() {
               </div>
 
               <div className="flex gap-2 pt-4 border-t">
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setEditingOcorrencia(viewingOcorrencia);
-                    setViewingOcorrencia(null);
-                    setShowForm(true);
-                  }}
-                  variant="outline"
-                >
-                  Editar
-                </Button>
+                {/* Botão Editar Removido conforme solicitado */}
                 <DeleteAction onConfirm={() => {
                   deleteMutation.mutate(viewingOcorrencia.id);
                   setViewingOcorrencia(null);
@@ -404,17 +636,7 @@ export default function Ocorrencias() {
                       >
                         Ver Detalhes
                       </Button>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setEditingOcorrencia(ocorrencia);
-                          setShowForm(true);
-                        }}
-                        size="sm"
-                        variant="outline"
-                      >
-                        Editar
-                      </Button>
+                      {/* Botão Editar Removido dos Cards também */}
                       <DeleteAction onConfirm={() => deleteMutation.mutate(ocorrencia.id)} />
                     </div>
                   </div>
